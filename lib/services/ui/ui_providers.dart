@@ -30,3 +30,10 @@ final tracksLoadingStateProvider = Provider<AsyncValue>(
     ref.watch(rawTracksProvider),
   ),
 );
+
+final coverLoadingStateProvider = Provider<AsyncValue>(
+  (ref) => combineStates(
+    ref.watch(workInfoLoadingStateProvider),
+    ref.watch(coverBytesProvider),
+  ),
+);

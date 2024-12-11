@@ -14,7 +14,7 @@ final workInfoProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
   }
 
   Log.info('Fetch workInfo. id: $id');
-  return api.getWorkInfo(id: id);
+  return api.getWorkInfo(id);
 });
 
 final titleProvider = Provider<String>((ref) {
@@ -78,7 +78,7 @@ final coverBytesProvider = FutureProvider<Uint8List?>((ref) async {
   }
 
   Log.info('Fetch cover bytes. id: $id');
-  return api.getCoverBytes(id: id);
+  return api.getCoverBytes(id);
 });
 
 final tagLsProvider = Provider<List<String>>((ref) {

@@ -47,10 +47,7 @@ class AsmrApi {
     );
   }
 
-  AsmrApi({
-    String initialProxy = 'DIRECT',
-    String initialApiChannel = 'asmr-200',
-  }) {
+  AsmrApi() {
     _apiDio = Dio(BaseOptions(
       connectTimeout: Duration(seconds: 5),
       receiveTimeout: Duration(seconds: 10),
@@ -61,9 +58,6 @@ class AsmrApi {
       receiveTimeout: Duration(seconds: 10),
       sendTimeout: Duration(seconds: 10),
     ));
-
-    proxy = initialProxy;
-    setApiChannel(initialApiChannel);
   }
 
   void setApiChannel(String apiChannel) {
@@ -101,45 +95,62 @@ class AsmrApi {
     }
   }
 
-  /// [GET] request with retry logic, returns null if failed after `maxTry` tries.
+  Future<Response<T>?> _requestWithRetry<T>(
+    Future<Response<T>> Function() request, {
+    required String method,
+    required String path,
+    int maxTry = 3,
+  }) async {
+    int tryCount = 0;
+    while (tryCount < maxTry) {
+      try {
+        tryCount++;
+        final response = await request();
+        Log.info('[$method] request to "$path" succeeded');
+        return response;
+      } on DioException catch (e) {
+        Log.warning('[$method] request to "$path" failed\n'
+            'Current try: $tryCount\n'
+            'error: $e');
+        await Future.delayed(Duration(seconds: 3));
+      } catch (e) {
+        Log.error('[$method] request to "$path" failed\n'
+            'Current try: $tryCount\n'
+            'unhandled error: $e');
+        return null;
+      }
+    }
+
+    Log.error('[$method] request to "$path" failed after $maxTry tries');
+    return null;
+  }
+
   Future<Response<T>?> get<T>(
-    String route, {
+    String path, {
     Object? data,
     Map<String, dynamic>? queryParameters,
     Options? options,
     CancelToken? cancelToken,
     void Function(int, int)? onReceiveProgress,
     int maxTry = 3,
-  }) async {
-    int tryCount = 0;
-    Response<T>? response;
-    while (tryCount < maxTry && response == null) {
-      try {
-        tryCount++;
-        response = await _apiDio.get<T>(
-          route,
-          data: data,
-          queryParameters: queryParameters,
-          options: options,
-          cancelToken: cancelToken,
-          onReceiveProgress: onReceiveProgress,
-        );
-        Log.info('[GET] request to "$route" successfully');
-        return response;
-      } catch (e) {
-        Log.warning('[GET] request to "$route" failed\n'
-            'Current try: $tryCount\n'
-            'error: $e');
-        await Future.delayed(Duration(seconds: 3));
-      }
-    }
-    Log.error('[GET] request to "$route" failed after $maxTry tries');
-    return null;
+  }) {
+    return _requestWithRetry(
+      () => _apiDio.get<T>(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: options,
+        cancelToken: cancelToken,
+        onReceiveProgress: onReceiveProgress,
+      ),
+      method: 'GET',
+      path: path,
+      maxTry: maxTry,
+    );
   }
 
-  /// [POST] request with retry logic, returns null if failed after `maxTry` tries.
   Future<Response<T>?> post<T>(
-    String route, {
+    String path, {
     Object? data,
     Map<String, dynamic>? queryParameters,
     Options? options,
@@ -147,35 +158,23 @@ class AsmrApi {
     void Function(int, int)? onSendProgress,
     void Function(int, int)? onReceiveProgress,
     int maxTry = 3,
-  }) async {
-    int tryCount = 0;
-    Response<T>? response;
-    while (tryCount < maxTry && response == null) {
-      try {
-        tryCount++;
-        response = await _apiDio.post<T>(
-          route,
-          data: data,
-          queryParameters: queryParameters,
-          options: options,
-          cancelToken: cancelToken,
-          onSendProgress: onSendProgress,
-          onReceiveProgress: onReceiveProgress,
-        );
-        Log.info('[POST] request to "$route" successfully');
-        return response;
-      } catch (e) {
-        Log.warning('[POST] request to "$route" failed\n'
-            'Current try: $tryCount\n'
-            'error: $e');
-        await Future.delayed(Duration(seconds: 3));
-      }
-    }
-    Log.error('[POST] request to "$route" failed after $maxTry tries');
-    return null;
+  }) {
+    return _requestWithRetry(
+      () => _apiDio.post<T>(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: options,
+        cancelToken: cancelToken,
+        onSendProgress: onSendProgress,
+        onReceiveProgress: onReceiveProgress,
+      ),
+      method: 'POST',
+      path: path,
+      maxTry: maxTry,
+    );
   }
 
-  /// [HEAD] request with retry logic, returns null if failed after `maxTry` tries.
   Future<Response<T>?> head<T>(
     String path, {
     Object? data,
@@ -183,30 +182,19 @@ class AsmrApi {
     Options? options,
     CancelToken? cancelToken,
     int maxTry = 3,
-  }) async {
-    int tryCount = 0;
-    Response<T>? response;
-    while (tryCount < maxTry && response == null) {
-      try {
-        tryCount++;
-        response = await _apiDio.head<T>(
-          path,
-          data: data,
-          queryParameters: queryParameters,
-          options: options,
-          cancelToken: cancelToken,
-        );
-        Log.info('[HEAD] request to "$path" successfully');
-        return response;
-      } catch (e) {
-        Log.warning('[HEAD] request to "$path" failed\n'
-            'Current try: $tryCount\n'
-            'error: $e');
-        await Future.delayed(Duration(seconds: 3));
-      }
-    }
-    Log.error('[HEAD] request to "$path" failed after $maxTry tries');
-    return null;
+  }) {
+    return _requestWithRetry(
+      () => _apiDio.head<T>(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: options,
+        cancelToken: cancelToken,
+      ),
+      method: 'HEAD',
+      path: path,
+      maxTry: maxTry,
+    );
   }
 
   Future<Response<dynamic>> download(
@@ -348,17 +336,17 @@ class AsmrApi {
     );
   }
 
-  Future<Map<String, dynamic>?> getWorkInfo({required String id}) async {
+  Future<Map<String, dynamic>?> getWorkInfo(String id) async {
     final response = await get<Map<String, dynamic>>('work/$id');
     return response?.data;
   }
 
-  Future<List<dynamic>?> getTracks({required String id}) async {
+  Future<List<dynamic>?> getTracks(String id) async {
     final response = await get<List<dynamic>>('tracks/$id');
     return response?.data;
   }
 
-  Future<Uint8List?> getCoverBytes({required String id}) async {
+  Future<Uint8List?> getCoverBytes(String id) async {
     try {
       // 指定响应类型为二进制
       final response = await get('cover/$id.jpg',

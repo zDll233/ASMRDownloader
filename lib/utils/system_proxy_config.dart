@@ -16,13 +16,13 @@ base class WINHTTP_CURRENT_USER_IE_PROXY_CONFIG extends Struct {
 }
 
 class SystemProxyConfig {
-  bool? fAutoDetect;
+  bool? autoDetect;
   String? autoConfigUrl;
   String? proxy;
   String? proxyBypass;
 
   SystemProxyConfig({
-    this.fAutoDetect,
+    this.autoDetect,
     this.autoConfigUrl,
     this.proxy,
     this.proxyBypass,
@@ -41,42 +41,43 @@ class SystemProxyConfig {
       Pointer<Void> Function(Pointer<Void> mem)>('GlobalFree');
 
   factory SystemProxyConfig.getConfig() {
-    final proxyConfig = calloc<WINHTTP_CURRENT_USER_IE_PROXY_CONFIG>();
+    final pUserIEProxyConfig = calloc<WINHTTP_CURRENT_USER_IE_PROXY_CONFIG>();
 
     try {
-      final result = _WinHttpGetIEProxyConfigForCurrentUser(proxyConfig);
+      final result = _WinHttpGetIEProxyConfigForCurrentUser(pUserIEProxyConfig);
+      final systemProxyConfig = SystemProxyConfig();
 
       if (result != 0) {
-        final configRef = proxyConfig.ref;
-        final systemProxyConfig = SystemProxyConfig();
+        systemProxyConfig.autoDetect = pUserIEProxyConfig.ref.fAutoDetect != 0;
 
-        systemProxyConfig.fAutoDetect = configRef.fAutoDetect != 0;
-
-        final lpszAutoConfigUrl = configRef.lpszAutoConfigUrl;
+        final lpszAutoConfigUrl = pUserIEProxyConfig.ref.lpszAutoConfigUrl;
         if (lpszAutoConfigUrl != nullptr) {
           systemProxyConfig.autoConfigUrl = lpszAutoConfigUrl.toDartString();
           _GlobalFree(lpszAutoConfigUrl.cast());
         }
 
-        final lpszProxy = configRef.lpszProxy;
+        final lpszProxy = pUserIEProxyConfig.ref.lpszProxy;
         if (lpszProxy != nullptr) {
           systemProxyConfig.proxy = lpszProxy.toDartString();
           _GlobalFree(lpszProxy.cast());
         }
 
-        final lpszProxyBypass = configRef.lpszProxyBypass;
+        final lpszProxyBypass = pUserIEProxyConfig.ref.lpszProxyBypass;
         if (lpszProxyBypass != nullptr) {
           systemProxyConfig.proxyBypass = lpszProxyBypass.toDartString();
           _GlobalFree(lpszProxyBypass.cast());
         }
-
-        return systemProxyConfig;
       } else {
-        Log.error('Failed to get system proxy config');
-        return SystemProxyConfig();
+        Log.error('Failed to get system proxy config.\n'
+            'error: `WinHttpGetIEProxyConfigForCurrentUser` failed to execute.');
       }
+
+      return systemProxyConfig;
+    } catch (e) {
+      Log.error('Failed to get system proxy config.\n' 'error: $e');
+      return SystemProxyConfig();
     } finally {
-      calloc.free(proxyConfig);
+      calloc.free(pUserIEProxyConfig);
     }
   }
 
